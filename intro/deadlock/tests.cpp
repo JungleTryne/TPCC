@@ -23,7 +23,6 @@ TEST_SUITE(Deadlock) {
       Mutex mutex;
 
       auto locker = [&]() {
-        // Your code goes here
         // use mutex.Lock() / mutex.Unlock() to lock/unlock mutex
         mutex.Lock();
         mutex.Lock();
@@ -53,7 +52,6 @@ TEST_SUITE(Deadlock) {
       // Fiber routines
 
       auto first = [&]() {
-        // Your code goes here
         // Use Yield() to reschedule current fiber
         a.Lock();  // Catching mutex a
 
