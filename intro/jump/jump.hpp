@@ -8,15 +8,7 @@ using reg_t = uint64_t;
 
 // Saved execution context
 struct JumpContext {
-  reg_t rax, rbx, rcx, rdx;
-
-  reg_t rsi, rdi;
-
-  reg_t rbp, rsp;
-
-  reg_t r8, r9, r10, r11, r12, r13, r14, r15;
-
-  reg_t rip;
+  reg_t rip, rsp, rbp;
 };
 
 // Captures the current execution context into 'ctx'
