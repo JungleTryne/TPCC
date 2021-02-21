@@ -9,7 +9,7 @@ namespace solutions {
 template <typename T>
 class Guarded {
  public:
-  // Custom reference class. Allows us to unlock mutex as long as
+  // Custom reference class. Allows us to unlоck mutex as long as
   // the resource is not used (as long as pointer is getting destroyed).
   class GuardedReference {
    private:
