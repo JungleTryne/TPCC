@@ -14,16 +14,11 @@ class Guarded {
   class GuardedReference {
    private:
     T* object_;
-    twist::stdlike::mutex& mutex_;
+    std::lock_guard<twist::stdlike::mutex> mutex_;
 
    public:
     explicit GuardedReference(T* object_ref, twist::stdlike::mutex& mutex)
         : object_(object_ref), mutex_(mutex) {
-      mutex_.lock();
-    }
-
-    ~GuardedReference() {
-      mutex_.unlock();
     }
 
     T* operator->() {
