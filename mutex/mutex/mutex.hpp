@@ -34,7 +34,8 @@ class Mutex {
         // here all of the threads are notified that the mutex is unlocked
         previous_state = UNLOCKED;  // expecting it to be unlocked
 
-        // trying to get the mutex and set it to locked state
+        // trying to get the mutex and set it to locked state [we might've been
+        // waken up accidentally -> we check the availability of mutex]
       } while (!state_.compare_exchange_strong(previous_state, LOCKED_EMPTY));
     }
   }
