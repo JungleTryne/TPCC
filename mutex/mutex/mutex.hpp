@@ -26,13 +26,13 @@ class Mutex {
 
     if (expected_state != UNLOCKED) {
       do {
-        /* Expected state is not unlocked -> it was either LOCKED_EMPTY
+        /* Expected state is not UNLOCKED -> it was either LOCKED_EMPTY
          * or LOCKED_WAITING. As we are not the first thread to try to
          * lock the mutex we stand to the queue -> queue now must have the
          * state LOCKED_WAITING
          */
 
-        if (state_.compare_exchange_strong(expected_state, LOCKED_WAITING)) {
+        while (state_.compare_exchange_strong(expected_state, LOCKED_WAITING)) {
           state_.wait(LOCKED_WAITING);
         }
 
