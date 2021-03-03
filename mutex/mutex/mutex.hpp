@@ -15,13 +15,13 @@ enum mutex_state {
   LOCKED_WAITING = 2  // Mutex is locked and there is a queue of threads
 };
 
-using mutex_state_t = uint32_t;
-using atomic_t = twist::stdlike::atomic<uint32_t>;
+using MutexStateT = uint32_t;
+using AtomicT = twist::stdlike::atomic<uint32_t>;
 
 class Mutex {
  public:
   void Lock() {
-    mutex_state_t expected_state = UNLOCKED;
+    MutexStateT expected_state = UNLOCKED;
     state_.compare_exchange_strong(expected_state, LOCKED_EMPTY);
 
     if (expected_state != UNLOCKED) {
@@ -62,7 +62,7 @@ class Mutex {
   }
 
  private:
-  atomic_t state_;
+  AtomicT state_;
 };
 
 }  // namespace solutions
