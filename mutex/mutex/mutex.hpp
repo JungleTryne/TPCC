@@ -15,28 +15,36 @@ enum mutex_state {
   LOCKED_WAITING = 2  // Mutex is locked and there is a queue of threads
 };
 
+using mutex_state_t = uint32_t;
+using atomic_t = twist::stdlike::atomic<uint32_t>;
+
 class Mutex {
  public:
   void Lock() {
-    uint32_t previous_state = UNLOCKED;  // expecting state to be UNLOCKED
-    state_.compare_exchange_strong(previous_state, LOCKED_EMPTY);
+    mutex_state_t expected_state = UNLOCKED;
+    state_.compare_exchange_strong(expected_state, LOCKED_EMPTY);
 
-    // if it is already locked -> wait
-    if (previous_state != UNLOCKED) {
+    if (expected_state != UNLOCKED) {
       do {
-        // if there is a queue OR there is no queue but it's locked [and we
-        // change the state]
-        if (previous_state == LOCKED_WAITING ||
-            state_.compare_exchange_strong(previous_state, LOCKED_WAITING)) {
+        /* Expected state is not unlocked -> it was either LOCKED_EMPTY
+         * or LOCKED_WAITING. As we are not the first thread to try to
+         * lock the mutex we stand to the queue -> queue now must have the
+         * state LOCKED_WAITING
+         */
+
+        if (state_.compare_exchange_strong(expected_state, LOCKED_WAITING)) {
           state_.wait(LOCKED_WAITING);
         }
 
-        // here all of the threads are notified that the mutex is unlocked
-        previous_state = UNLOCKED;  // expecting it to be unlocked
+        // --> Here all of the threads are notified that the mutex is unlocked
 
-        // trying to get the mutex and set it to locked state [we might've been
-        // waken up accidentally -> we check the availability of mutex]
-      } while (!state_.compare_exchange_strong(previous_state, LOCKED_EMPTY));
+        expected_state = UNLOCKED;
+
+        /* Trying to get the mutex and set it to locked state [we might've been
+         * waken up accidentally -> we check the availability of mutex]
+         */
+
+      } while (!state_.compare_exchange_strong(expected_state, LOCKED_EMPTY));
     }
   }
 
@@ -44,15 +52,14 @@ class Mutex {
     uint32_t previous_state = LOCKED_EMPTY;
     state_.compare_exchange_strong(previous_state, UNLOCKED);
 
-    if (previous_state !=
-        LOCKED_EMPTY) {        // if there are threads to be notified
+    if (previous_state != LOCKED_EMPTY) {
       state_.store(UNLOCKED);  // still unlock
       state_.notify_all();     // notify
     }
   }
 
  private:
-  twist::stdlike::atomic<uint32_t> state_;
+  atomic_t state_;
 };
 
 }  // namespace solutions
