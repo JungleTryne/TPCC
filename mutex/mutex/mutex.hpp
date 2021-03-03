@@ -50,11 +50,14 @@ class Mutex {
 
   void Unlock() {
     uint32_t previous_state = LOCKED_EMPTY;
+
+    // Let's try to unlock mutex without core-move
     state_.compare_exchange_strong(previous_state, UNLOCKED);
 
+    // Didn't succeed? (previous_state was changed)
     if (previous_state != LOCKED_EMPTY) {
-      state_.store(UNLOCKED);  // still unlock
-      state_.notify_all();     // notify
+      state_.store(UNLOCKED);  // Still unlock
+      state_.notify_all();
     }
   }
 
