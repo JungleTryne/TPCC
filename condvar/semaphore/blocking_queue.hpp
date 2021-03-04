@@ -22,9 +22,9 @@ class BlockingQueue {
   void Put(T value) {
     bound_top_tokens_.Acquire();
 
-    queue_protector_.Acquire();
+    queue_protector_.Acquire();  // Buffer protection begin
     buffer_.push_back(std::move(value));
-    queue_protector_.Release();
+    queue_protector_.Release();  // Buffer protection end
 
     bound_bottom_tokens_.Release();
   }
@@ -34,10 +34,10 @@ class BlockingQueue {
   T Take() {
     bound_bottom_tokens_.Acquire();
 
-    queue_protector_.Acquire();
+    queue_protector_.Acquire();  // Buffer protection begin
     T value = std::move(buffer_.front());
     buffer_.pop_front();
-    queue_protector_.Release();
+    queue_protector_.Release();  // Buffer protection end
 
     bound_top_tokens_.Release();
     return value;
