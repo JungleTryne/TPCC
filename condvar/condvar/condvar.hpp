@@ -15,9 +15,18 @@ class ConditionVariable {
 
   template <class Mutex>
   void Wait(Mutex& mutex) {
+    /* ConditionVariable::ticket_ indicates current active
+     * "queue" number for the condvar
+     */
+
     uint32_t current_ticket = ticket_.load();
 
     mutex.unlock();
+
+    /* If another thread calls Notify[One/All], the active queue
+     * number will be changed. Therefore, ticket_.wait will be "ignored",
+     * so the operation Wait is atomic indeed
+     */
 
     ticket_.wait(current_ticket);
 
@@ -25,12 +34,16 @@ class ConditionVariable {
   }
 
   void NotifyOne() {
+    /* Changing active queue number */
     ticket_.fetch_add(1);
+
     ticket_.notify_one();
   }
 
   void NotifyAll() {
+    /* Changing active queue number */
     ticket_.fetch_add(1);
+
     ticket_.notify_all();
   }
 
