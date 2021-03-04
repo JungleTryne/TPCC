@@ -15,11 +15,11 @@ class ConditionVariable {
 
   template <class Mutex>
   void Wait(Mutex& mutex) {
-    uint32_t currentTicket = ticket_.load();
+    uint32_t current_ticket = ticket_.load();
 
     mutex.unlock();
 
-    ticket_.wait(currentTicket);
+    ticket_.wait(current_ticket);
 
     mutex.lock();
   }
