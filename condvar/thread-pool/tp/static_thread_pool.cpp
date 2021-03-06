@@ -46,7 +46,10 @@ StaticThreadPool::~StaticThreadPool() {
 
 void StaticThreadPool::Submit(Task task) {
   workers_hr_.AcquireWorker();
-  task_queue_.Put(std::move(task));
+  bool result = task_queue_.Put(std::move(task));
+  if (!result) {
+    workers_hr_.ReleaseWorker();
+  }
 }
 
 void StaticThreadPool::Join() {
