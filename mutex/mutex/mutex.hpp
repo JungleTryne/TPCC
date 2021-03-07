@@ -11,7 +11,7 @@ using twist::util::SpinWait;
 
 enum mutex_state {
   UNLOCKED = 0,
-  LOCKED = 1,  // Mutex is locked and there is a queue of threads
+  LOCKED = 1,
 };
 
 using MutexStateT = uint32_t;
@@ -20,33 +20,41 @@ using AtomicT = twist::stdlike::atomic<uint32_t>;
 class Mutex {
  public:
   void Lock() {
+    /* expecting mutex to be unlocked */
     MutexStateT expected_state = UNLOCKED;
 
     if (state_.compare_exchange_strong(expected_state, LOCKED)) {
       return;
     }
 
-    counter_.fetch_add(1);
+    /* here we are going to wait for the mutex unlock */
+    waiting_counter_.fetch_add(1);
 
     do {
+      // expected_state is LOCKED now
       state_.wait(expected_state);
+
+      // We are woken up -> we want to acquire the mutex -> expecting it to be
+      // unlocked
       expected_state = UNLOCKED;
     } while (!state_.compare_exchange_strong(expected_state, LOCKED));
 
-    counter_.fetch_sub(1);
+    // releasing counter
+    waiting_counter_.fetch_sub(1);
   }
 
   void Unlock() {
+    // Unlocking the mutex
     state_.store(UNLOCKED);
 
-    if (counter_ > 0) {
+    if (waiting_counter_ > 0) {
       state_.notify_one();
     }
   }
 
  private:
   AtomicT state_{UNLOCKED};
-  AtomicT counter_{0};
+  AtomicT waiting_counter_{0};
 };
 
 }  // namespace solutions
