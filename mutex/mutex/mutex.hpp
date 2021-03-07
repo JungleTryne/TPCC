@@ -20,7 +20,7 @@ class Mutex {
  public:
   void Lock() {
     /* expecting mutex to be unlocked */
-    if (!state_.exchange(LOCKED)) {
+    if (state_.exchange(LOCKED) == 0u) {
       return;
     }
 
@@ -32,7 +32,7 @@ class Mutex {
       state_.wait(LOCKED);
 
       // We are woken up -> we want to acquire the mutex -> expecting it to be
-    } while (state_.exchange(LOCKED));
+    } while (state_.exchange(LOCKED) != 0u);
 
     // releasing counter
     waiting_counter_.fetch_sub(1);
