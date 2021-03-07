@@ -35,9 +35,7 @@ class Mutex {
       state_.wait(expected_state);
 
       // We are woken up -> we want to acquire the mutex -> expecting it to be
-      // unlocked
-      expected_state = UNLOCKED;
-    } while (!state_.compare_exchange_strong(expected_state, LOCKED));
+    } while (state_.exchange(LOCKED));
 
     // releasing counter
     waiting_counter_.fetch_sub(1);
