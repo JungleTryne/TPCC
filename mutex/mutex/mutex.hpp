@@ -21,9 +21,7 @@ class Mutex {
  public:
   void Lock() {
     /* expecting mutex to be unlocked */
-    MutexStateT expected_state = UNLOCKED;
-
-    if (state_.compare_exchange_strong(expected_state, LOCKED)) {
+    if (!state_.exchange(LOCKED)) {
       return;
     }
 
@@ -32,7 +30,7 @@ class Mutex {
 
     do {
       // expected_state is LOCKED now
-      state_.wait(expected_state);
+      state_.wait(LOCKED);
 
       // We are woken up -> we want to acquire the mutex -> expecting it to be
     } while (state_.exchange(LOCKED));
