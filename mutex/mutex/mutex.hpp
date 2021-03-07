@@ -14,7 +14,6 @@ enum mutex_state {
   LOCKED = 1,
 };
 
-using MutexStateT = uint32_t;
 using AtomicT = twist::stdlike::atomic<uint32_t>;
 
 class Mutex {
