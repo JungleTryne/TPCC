@@ -11,8 +11,7 @@ using twist::util::SpinWait;
 
 enum mutex_state {
   UNLOCKED = 0,
-  LOCKED_EMPTY = 1,   // Mutex is locked and no one waits for it
-  LOCKED_WAITING = 2  // Mutex is locked and there is a queue of threads
+  LOCKED = 1,  // Mutex is locked and there is a queue of threads
 };
 
 using MutexStateT = uint32_t;
@@ -22,47 +21,32 @@ class Mutex {
  public:
   void Lock() {
     MutexStateT expected_state = UNLOCKED;
-    state_.compare_exchange_strong(expected_state, LOCKED_EMPTY);
 
-    if (expected_state != UNLOCKED) {
-      do {
-        /* Expected state is not UNLOCKED -> it was either LOCKED_EMPTY
-         * or LOCKED_WAITING. As we are not the first thread to try to
-         * lock the mutex we stand to the queue -> queue now must have the
-         * state LOCKED_WAITING
-         */
-
-        while (state_.compare_exchange_strong(expected_state, LOCKED_WAITING)) {
-          state_.wait(LOCKED_WAITING);
-        }
-
-        // --> Here all of the threads are notified that the mutex is unlocked
-
-        expected_state = UNLOCKED;
-
-        /* Trying to get the mutex and set it to locked state [we might've been
-         * waken up accidentally -> we check the availability of mutex]
-         */
-
-      } while (!state_.compare_exchange_strong(expected_state, LOCKED_EMPTY));
+    if (state_.compare_exchange_strong(expected_state, LOCKED)) {
+      return;
     }
+
+    counter_.fetch_add(1);
+
+    do {
+      state_.wait(expected_state);
+      expected_state = UNLOCKED;
+    } while (!state_.compare_exchange_strong(expected_state, LOCKED));
+
+    counter_.fetch_sub(1);
   }
 
   void Unlock() {
-    uint32_t previous_state = LOCKED_EMPTY;
+    state_.store(UNLOCKED);
 
-    // Let's try to unlock mutex without core-move
-    state_.compare_exchange_strong(previous_state, UNLOCKED);
-
-    // Didn't succeed? (previous_state was changed)
-    if (previous_state != LOCKED_EMPTY) {
-      state_.store(UNLOCKED);  // Still unlock
-      state_.notify_all();
+    if (counter_ > 0) {
+      state_.notify_one();
     }
   }
 
  private:
-  AtomicT state_;
+  AtomicT state_{UNLOCKED};
+  AtomicT counter_{0};
 };
 
 }  // namespace solutions
