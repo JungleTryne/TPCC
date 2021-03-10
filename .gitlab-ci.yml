@@ -1,0 +1,7 @@
+grade:
+  tags:
+    - concurrency-course-main
+  script:
+    - /grade.py
+  only:
+    - merge_requests
