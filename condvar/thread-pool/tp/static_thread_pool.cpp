@@ -23,16 +23,13 @@ StaticThreadPool::StaticThreadPool(size_t workers) {
         return;  // The poison pill is std::nullopt
       }
 
-      workers_boss_.AcquireWorker();
-      workers_hr_.ReleaseWorker();
-
       try {
         (*task_to_execute)();
       } catch (...) {
         // Do nothing
       }
 
-      workers_boss_.ReleaseWorker();
+      workers_manager_.ReleaseWorker();
     }
   };
 
@@ -45,16 +42,15 @@ StaticThreadPool::~StaticThreadPool() {
 }
 
 void StaticThreadPool::Submit(Task task) {
-  workers_hr_.AcquireWorker();
+  workers_manager_.AcquireWorker();
   bool result = task_queue_.Put(std::move(task));
   if (!result) {
-    workers_hr_.ReleaseWorker();
+    workers_manager_.ReleaseWorker();
   }
 }
 
 void StaticThreadPool::Join() {
-  workers_hr_.EverybodyHome();
-  workers_boss_.EverybodyHome();
+  workers_manager_.EverybodyHome();
 
   task_queue_.Close();
   for (auto& worker : pool_) {

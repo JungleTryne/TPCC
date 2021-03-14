@@ -41,8 +41,7 @@ class StaticThreadPool {
   tp::UnboundedBlockingQueue<Task> task_queue_;
   std::vector<ThreadT> pool_;
 
-  WorkersHandler workers_boss_{0};
-  WorkersHandler workers_hr_{0};
+  WorkersHandler workers_manager_{0};
 };
 
 inline StaticThreadPool* Current() {
