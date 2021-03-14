@@ -15,7 +15,6 @@ using ThreadT = twist::stdlike::thread;
 class StaticThreadPool {
  public:
   explicit StaticThreadPool(size_t workers);
-  ~StaticThreadPool();
 
   // Non-copyable
   StaticThreadPool(const StaticThreadPool&) = delete;
@@ -41,7 +40,7 @@ class StaticThreadPool {
   tp::UnboundedBlockingQueue<Task> task_queue_;
   std::vector<ThreadT> pool_;
 
-  WorkersHandler workers_manager_{0};
+  WorkersHandler workers_manager_;
 };
 
 inline StaticThreadPool* Current() {

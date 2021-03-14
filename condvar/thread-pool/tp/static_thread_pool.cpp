@@ -13,32 +13,24 @@ static twist::util::ThreadLocal<StaticThreadPool*> pool{nullptr};
 ////////////////////////////////////////////////////////////////////////////////
 
 StaticThreadPool::StaticThreadPool(size_t workers) {
-  auto pool_brain = [&]() {
+  auto worker_brain = [&]() {
     *pool = this;
 
     while (true) {
-      auto task_to_execute = task_queue_.Take();
+      auto task = task_queue_.Take();
 
-      if (!task_to_execute.has_value()) {
+      if (!task.has_value()) {
         return;  // The poison pill is std::nullopt
       }
 
-      try {
-        (*task_to_execute)();
-      } catch (...) {
-        // Do nothing
-      }
-
+      ExecuteHere(*task);
       workers_manager_.ReleaseWorker();
     }
   };
 
   for (size_t i = 0; i < workers; ++i) {
-    pool_.push_back(ThreadT{pool_brain});
+    pool_.emplace_back(std::move(worker_brain));
   }
-}
-
-StaticThreadPool::~StaticThreadPool() {
 }
 
 void StaticThreadPool::Submit(Task task) {

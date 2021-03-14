@@ -17,7 +17,7 @@ template <typename T>
 class UnboundedBlockingQueue {
  public:
   bool Put(T value) {
-    std::lock_guard<MutexT> lock(mutex_);
+    std::lock_guard lock(mutex_);
 
     if (closed_) {
       return false;
@@ -29,7 +29,7 @@ class UnboundedBlockingQueue {
   }
 
   std::optional<T> Take() {
-    std::unique_lock<MutexT> lock(mutex_);
+    std::unique_lock lock(mutex_);
 
     empty_queue_.wait(lock, [&] {
       return closed_ || !buffer_.empty();
@@ -55,7 +55,7 @@ class UnboundedBlockingQueue {
 
  private:
   void CloseImpl(bool clear) {
-    std::lock_guard<MutexT> lock(mutex_);
+    std::lock_guard lock(mutex_);
 
     closed_ = true;
     empty_queue_.notify_all();
