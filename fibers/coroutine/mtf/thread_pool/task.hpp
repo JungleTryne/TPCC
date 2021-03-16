@@ -1,9 +1,9 @@
 #pragma once
 
-#include <functional>
+#include <wheels/support/function.hpp>
 
 namespace mtf::tp {
 
-using Task = std::function<void()>;
+using Task = wheels::UniqueFunction<void()>;
 
 }  // namespace mtf::tp

@@ -35,6 +35,9 @@ bool Coroutine::IsCompleted() const {
 void Coroutine::Trampoline() {
   Coroutine* co = current_coroutine;
 
+  // Finalize first context switch
+  co->routine_context_.AfterStart();
+
   // Executing the routine
   try {
     co->routine_();

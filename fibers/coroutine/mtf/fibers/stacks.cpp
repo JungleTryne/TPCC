@@ -1,18 +1,36 @@
 #include <mtf/fibers/stacks.hpp>
 
-#include <atomic>
-
 namespace mtf::fibers {
 
-using context::Stack;
+Stack StackAllocator::Allocate() {
+  std::lock_guard guard(lock_);
+
+  if (pool_.empty()) {
+    return GetNewStack();
+  }
+
+  auto stack = std::move(pool_.back());
+  pool_.pop_back();
+  return stack;
+}
+
+void StackAllocator::Release(Stack stack) {
+  std::lock_guard guard(lock_);
+  pool_.push_back(std::move(stack));
+}
+
+Stack StackAllocator::GetNewStack() {
+  return Stack::AllocatePages(kDefaultStackSizeInPages);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 Stack AllocateStack() {
-  static const size_t kStackPages = 8;
-  return Stack::AllocatePages(kStackPages);
+  return allocator.Allocate();
 }
 
 void ReleaseStack(Stack stack) {
-  Stack released{std::move(stack)};
+  allocator.Release(std::move(stack));
 }
 
 }  // namespace mtf::fibers

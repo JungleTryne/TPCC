@@ -12,11 +12,11 @@ StaticThreadPool::~StaticThreadPool() {
 }
 
 void StaticThreadPool::Submit(Task task) {
-  asio::post(io_context_, task);
+  asio::post(io_context_, std::move(task));
 }
 
 void StaticThreadPool::SubmitContinuation(Task cont) {
-  asio::defer(io_context_, cont);
+  asio::defer(io_context_, std::move(cont));
 }
 
 static thread_local StaticThreadPool* pool{nullptr};
