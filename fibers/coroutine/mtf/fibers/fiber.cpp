@@ -12,10 +12,12 @@ namespace mtf::fibers {
 using coroutine::impl::Coroutine;
 using tp::StaticThreadPool;
 
-static const bool kWithoutContinuation = false;
-static const bool kWithContinuation = true;
-
 ////////////////////////////////////////////////////////////////////////////////
+
+enum class PlanningType : bool {
+  WithContinuation = true,
+  WithoutContinuation = false
+};
 
 class Fiber {
  public:
@@ -27,12 +29,12 @@ class Fiber {
     ReleaseStack(std::move(stack_));
   }
 
-  void Execute();
-  void PlanTask(bool continuation);
+  void Schedule();
 
  private:
   Coroutine* CoroutineFactory();
   void ConstructCoroutine();
+  void PlanTask(PlanningType pt);
 
  private:
   Routine routine_;
@@ -51,23 +53,23 @@ Coroutine* Fiber::CoroutineFactory() {
   return coroutine_.get();
 }
 
-void Fiber::Execute() {
-  PlanTask(kWithoutContinuation);
+void Fiber::Schedule() {
+  PlanTask(PlanningType::WithoutContinuation);
 }
 
-void Fiber::PlanTask(bool continuation) {
+void Fiber::PlanTask(PlanningType pt) {
   mtf::tp::Task worker_task = [&] {
     Coroutine* worker_co = CoroutineFactory();
     worker_co->Resume();
 
     if (!worker_co->IsCompleted()) {
-      PlanTask(kWithContinuation);
+      PlanTask(PlanningType::WithContinuation);
     } else {
       delete this;
     }
   };
 
-  if (!continuation) {
+  if (pt == PlanningType::WithoutContinuation) {
     scheduler_.Submit(std::move(worker_task));
   } else {
     scheduler_.SubmitContinuation(std::move(worker_task));
@@ -84,8 +86,7 @@ void Fiber::ConstructCoroutine() {
 void Spawn(Routine routine, StaticThreadPool& scheduler) {
   // Lifetime of the Fiber is controlled by itself
   Fiber* new_fiber = new Fiber{std::move(routine), scheduler};
-
-  new_fiber->Execute();
+  new_fiber->Schedule();
 }
 
 void Spawn(Routine routine) {
