@@ -59,13 +59,14 @@ void Scheduler::Yield() {
 }
 
 void Scheduler::SleepFor(Duration delay) {
-  Suspend();
-
-  Fiber* current_fiber = GetCurrentFiber();
   WaitableTimer timer(io_context_, delay);
-  timer.async_wait([&](const asio::error_code& /*error*/) {
+  Fiber* current_fiber = GetCurrentFiber();
+
+  timer.async_wait([this, current_fiber](const asio::error_code& /*error*/) {
     Resume(current_fiber);
   });
+
+  Suspend();
 }
 
 void Scheduler::Suspend() {
@@ -129,8 +130,9 @@ void Scheduler::Reschedule(Fiber* fiber) {
 }
 
 void Scheduler::Schedule(Fiber* fiber) {
-  io_context_.post([fiber] {
-    fiber->RunUserRoutine();
+  io_context_.post([this, fiber] {
+    Step(fiber);
+    Reschedule(fiber);
   });
 }
 
