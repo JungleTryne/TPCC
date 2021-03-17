@@ -1,8 +1,11 @@
 #pragma once
 
 #include <twist/stdlike/atomic.hpp>
+#include <twist/util/spin_wait.hpp>
 
 namespace mtf::fibers {
+
+using twist::util::SpinWait;
 
 using AtomicT = twist::stdlike::atomic<uint32_t>;
 
