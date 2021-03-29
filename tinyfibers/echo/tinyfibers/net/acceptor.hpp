@@ -28,6 +28,8 @@ class Acceptor {
   wheels::Result<Socket> Accept();
 
  private:
+  static const uint16_t kAvailablePort = 0;
+
   asio::ip::tcp::acceptor acceptor_;
 };
 

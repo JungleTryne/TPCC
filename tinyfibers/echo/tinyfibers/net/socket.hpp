@@ -8,6 +8,8 @@
 
 namespace tinyfibers::net {
 
+using ResolverResults = asio::ip::basic_resolver_results<asio::ip::tcp>;
+
 class Socket {
   friend class Acceptor;
 
@@ -53,6 +55,21 @@ class Socket {
   wheels::Result<size_t> WriteSome(ConstBuffer buffer);
 
  private:
+  // Getting endpoints list related
+  // to the host address and the port
+  static auto GetEndpoints(std::string_view host, std::string_view port)
+      -> wheels::Result<ResolverResults>;
+
+  // Trying to connect to at least one
+  // endpoint from the list
+  static auto TryToConnect(ResolverResults endpoints_list)
+      -> wheels::Result<asio::ip::tcp::socket>;
+
+  // Trying to connect to the
+  // certain endpoint
+  static wheels::Status TryToConnectToEndpoint(
+      asio::ip::tcp::socket& socket, asio::ip::tcp::endpoint endpoint);
+
   inline static const std::string kLocalAddress = "127.0.0.1";
   asio::ip::tcp::socket socket_;
 };

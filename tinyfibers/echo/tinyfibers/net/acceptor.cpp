@@ -13,68 +13,62 @@ using wheels::make_result::Ok;
 using wheels::make_result::PropagateError;
 using wheels::make_result::ToStatus;
 
+using asio::ip::tcp;
+
 namespace tinyfibers::net {
 
 Acceptor::Acceptor() : acceptor_(*GetCurrentIOContext()) {
 }
 
 Status Acceptor::BindTo(uint16_t port) {
-  asio::error_code code;
+  tcp::endpoint endpoint(tcp::v4(), port);
+  asio::error_code err;
 
-  asio::ip::tcp::endpoint endpoint(asio::ip::tcp::v4(), port);
-
-  acceptor_.open(endpoint.protocol(), code);
-  if (code.value() != 0) {
-    return Fail(code);
+  acceptor_.open(endpoint.protocol(), err);
+  if (err) {
+    return Fail(err);
   }
 
-  acceptor_.bind(endpoint, code);
-  if (code.value() != 0) {
-    return Fail(code);
-  }
+  acceptor_.bind(endpoint, err);
 
-  return Ok();
+  return ToStatus(err);
 }
 
 Result<uint16_t> Acceptor::BindToAvailablePort() {
-  auto result = BindTo(0);
+  auto result = BindTo(kAvailablePort);
 
   if (result.HasError()) {
     return Fail(result.GetErrorCode());
   }
 
   try {
-    return Ok(GetPort());
+    return Ok(GetPort());  // GetPort() can throw exception
   } catch (...) {
     return Fail(std::current_exception());
   }
 }
 
 Status Acceptor::Listen(size_t backlog) {
-  asio::error_code code;
-  acceptor_.listen(backlog, code);
+  asio::error_code err;
+  acceptor_.listen(backlog, err);
 
-  if (code.value() != 0) {
-    return Fail(code);
-  }
-
-  return Ok();
+  return ToStatus(err);
 }
 
 Result<Socket> Acceptor::Accept() {
-  asio::error_code code;
-  asio::ip::tcp::socket socket(*GetCurrentIOContext());
+  asio::error_code err;
+  tcp::socket socket(*GetCurrentIOContext());
 
-  Future<asio::error_code> wait;
+  Future<asio::error_code> accept_result;
 
   acceptor_.async_accept(socket, [&](asio::error_code code) {
-    wait.SetValue(code);
+    accept_result.SetValue(code);
   });
 
-  code = wait.Get();
+  err = accept_result.Get();
 
-  if (code.value() != 0) {
-    return Fail(code);
+  if (err) {
+    return Fail(err);
   }
 
   return Ok(Socket{std::move(socket)});
