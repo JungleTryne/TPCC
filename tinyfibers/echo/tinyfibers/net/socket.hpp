@@ -49,7 +49,6 @@ class Socket {
 
  private:
   Socket(asio::ip::tcp::socket&& impl);
-  wheels::Status Connect(const std::string& host, uint16_t port);
 
   wheels::Result<size_t> WriteSome(ConstBuffer buffer);
 

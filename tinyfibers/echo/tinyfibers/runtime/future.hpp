@@ -14,7 +14,7 @@ class Future {
   // Blocks until the future is fulfilled
   wheels::Result<T> Get() {
     wait_for_promise_.Park();
-    return std::move(result_);
+    return *result_;
   }
 
   void SetValue(T value) {

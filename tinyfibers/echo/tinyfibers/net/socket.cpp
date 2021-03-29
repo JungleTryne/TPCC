@@ -1,7 +1,6 @@
 #include <tinyfibers/net/socket.hpp>
 
 #include <tinyfibers/runtime/scheduler.hpp>
-#include <tinyfibers/runtime/parking_lot.hpp>
 
 #include <tinyfibers/runtime/future.hpp>
 
@@ -17,51 +16,36 @@ using wheels::make_result::ToStatus;
 
 namespace tinyfibers::net {
 
-wheels::Status Socket::Connect(const std::string& host, uint16_t port) {
-  asio::ip::tcp::resolver resolver(*GetCurrentIOContext());
-  asio::error_code err_code;
+Result<Socket> Socket::ConnectTo(const std::string& host, uint16_t port) {
+  asio::io_context& context = *GetCurrentIOContext();
+  asio::ip::tcp::socket asio_sock(context);
 
+  asio::error_code err_code;
+  asio::ip::tcp::resolver resolver(*GetCurrentIOContext());
   auto endpoints_list = resolver.resolve(host, std::to_string(port), err_code);
 
-  if (err_code.value() != 0) {
+  if (err_code) {
     return Fail(err_code);
   }
 
   for (const auto& endpoint : endpoints_list) {
-    socket_.connect(endpoint, err_code);
+    Future<asio::error_code> wait;
 
-    if (err_code.value() == 0) {
+    asio_sock.async_connect(endpoint, [&](asio::error_code err) {
+      wait.SetValue(err);
+    });
+
+    auto err = wait.Get();
+    if (err->value() == 0) {
       break;
     }
   }
 
-  if (err_code.value() != 0) {
+  if (err_code) {
     return Fail(err_code);
   }
 
-  return Ok();
-}
-
-Result<Socket> Socket::ConnectTo(const std::string& host, uint16_t port) {
-  asio::io_context& context = *GetCurrentIOContext();
-  asio::ip::tcp::socket asio_sock(context);
-  asio::ip::tcp protocol = asio::ip::tcp::v4();
-
-  asio::error_code err_code;
-  asio_sock.open(protocol, err_code);
-
-  if (err_code.value() != 0) {
-    return Fail(err_code);
-  }
-
-  Socket new_socket{std::move(asio_sock)};
-  auto status = new_socket.Connect(host, port);
-
-  if (status.HasError()) {
-    return Fail(status.GetError());
-  }
-
-  return Ok(std::move(new_socket));
+  return Ok(Socket{std::move(asio_sock)});
 }
 
 Result<Socket> Socket::ConnectToLocal(uint16_t port) {
@@ -99,7 +83,7 @@ Result<size_t> Socket::Read(MutableBuffer buffer) {
     }
 
     if (*result == 0) {
-      return result;
+      return Ok(shift);
     }
     shift += *result;
   }
@@ -148,6 +132,7 @@ Status Socket::ShutdownWrite() {
   if (code.value() != 0) {
     return Fail(code);
   }
+
   return Ok();
 }
 

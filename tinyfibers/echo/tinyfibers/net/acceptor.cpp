@@ -1,7 +1,7 @@
 #include <tinyfibers/net/acceptor.hpp>
 
 #include <tinyfibers/runtime/scheduler.hpp>
-#include <tinyfibers/runtime/parking_lot.hpp>
+#include <tinyfibers/runtime/future.hpp>
 
 using wheels::Result;
 using wheels::Status;
@@ -38,6 +38,7 @@ Status Acceptor::BindTo(uint16_t port) {
 
 Result<uint16_t> Acceptor::BindToAvailablePort() {
   auto result = BindTo(0);
+
   if (result.HasError()) {
     return Fail(result.GetErrorCode());
   }
@@ -61,19 +62,22 @@ Status Acceptor::Listen(size_t backlog) {
 }
 
 Result<Socket> Acceptor::Accept() {
-  auto socket = Socket::ConnectToLocal(GetPort());
-  if (socket.HasError()) {
-    return socket;
-  }
-
   asio::error_code code;
-  acceptor_.accept(socket->socket_, code);
+  asio::ip::tcp::socket socket(*GetCurrentIOContext());
+
+  Future<asio::error_code> wait;
+
+  acceptor_.async_accept(socket, [&](asio::error_code code) {
+    wait.SetValue(code);
+  });
+
+  code = wait.Get();
 
   if (code.value() != 0) {
     return Fail(code);
   }
 
-  return socket;
+  return Ok(Socket{std::move(socket)});
 }
 
 uint16_t Acceptor::GetPort() const {

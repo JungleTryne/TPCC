@@ -17,6 +17,7 @@ class Acceptor {
   Acceptor& operator=(const Acceptor&) = delete;
 
   wheels::Status BindTo(uint16_t port);
+
   // Returns port number
   wheels::Result<uint16_t> BindToAvailablePort();
 
