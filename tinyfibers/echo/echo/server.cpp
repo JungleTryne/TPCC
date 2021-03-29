@@ -11,21 +11,23 @@ using tinyfibers::net::Socket;
 namespace echo {
 
 void AcceptClient(Socket socket) {
-  std::string buffer;
-  buffer.resize(256);
+  while (true) {
+    std::string buffer;
+    buffer.resize(256);
 
-  auto read_result = socket.Read({buffer.data(), buffer.size()});
+    auto read_result = socket.ReadSome({buffer.data(), buffer.size()});
 
-  if (read_result.HasError()) {
-    return;
+    if (read_result.HasError() || *read_result == 0) {
+      return;
+    }
+
+    buffer.resize(*read_result);
+
+    auto write_result = socket.Write({buffer.data(), buffer.size()});
+    if (write_result.HasError()) {
+      return;
+    }
   }
-
-  auto write_result = socket.Write({buffer.data(), buffer.size()});
-  if (write_result.HasError()) {
-    return;
-  }
-
-  AcceptClient(std::move(socket));
 }
 
 void ServeForever(uint16_t port) {
@@ -35,11 +37,9 @@ void ServeForever(uint16_t port) {
 
   while (true) {
     auto socket = acceptor.Accept();
-
     if (!socket.HasError()) {
-      Spawn([&] {
+      Spawn([socket = std::move(socket)]() mutable {
         AcceptClient(std::move(socket));
-        socket->ShutdownWrite().ThrowIfError();
       }).Detach();
     }
   }
