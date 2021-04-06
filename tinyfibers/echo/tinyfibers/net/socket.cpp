@@ -1,5 +1,7 @@
 #include <tinyfibers/net/socket.hpp>
 
+#include <tinyfibers/net/async_handler_builder.h>
+
 #include <tinyfibers/runtime/scheduler.hpp>
 
 #include <tinyfibers/runtime/future.hpp>
@@ -38,22 +40,17 @@ Result<Socket> Socket::ConnectToLocal(uint16_t port) {
 Result<size_t> Socket::ReadSome(MutableBuffer buffer) {
   Future<size_t> read_result;
 
-  socket_.async_read_some(
-      buffer, [&](const asio::error_code code, size_t received) {
-        if (code.value() != 0) {
-          if (code.value() != asio::error::eof &&
-              code.value() != asio::error::no_buffer_space) {
-            read_result.SetError(code);
-          } else {
-            read_result.SetValue(0);
-          }
-          return;
-        }
+  socket_.async_read_some(buffer, handler_builder::BuildTask(read_result));
 
-        read_result.SetValue(received);
-      });
+  auto result = read_result.Get();
 
-  return read_result.Get();
+  if (result.HasError() &&
+      (result.GetErrorCode() == asio::error::eof ||
+       result.GetErrorCode() == asio::error::no_buffer_space)) {
+    return Ok(0ul);
+  }
+
+  return result;
 }
 
 Result<size_t> Socket::Read(MutableBuffer buffer) {
@@ -75,21 +72,14 @@ Result<size_t> Socket::Read(MutableBuffer buffer) {
 wheels::Result<size_t> Socket::WriteSome(ConstBuffer buffer) {
   Future<size_t> write_result;
 
-  socket_.async_write_some(buffer,
-                           [&](const asio::error_code code, size_t written) {
-                             if (code.value() != 0) {
-                               if (code.value() != asio::error::eof) {
-                                 write_result.SetError(code);
-                               } else {
-                                 write_result.SetValue(0);
-                               }
-                               return;
-                             }
+  socket_.async_write_some(buffer, handler_builder::BuildTask(write_result));
 
-                             write_result.SetValue(written);
-                           });
+  auto result = write_result.Get();
+  if (result.HasError() && result.GetErrorCode() == asio::error::eof) {
+    return Ok(0ul);
+  }
 
-  return write_result.Get();
+  return result;
 }
 
 Status Socket::Write(ConstBuffer buffer) {
@@ -125,14 +115,19 @@ Socket::Socket(asio::ip::tcp::socket&& impl) : socket_(std::move(impl)) {
 auto Socket::GetEndpoints(std::string_view host, std::string_view port)
     -> wheels::Result<ResolverResults> {
   tcp::resolver resolver(*GetCurrentIOContext());
-  asio::error_code err_code;
-  auto endpoints_list = resolver.resolve(host, port, err_code);
 
-  if (err_code) {
-    return Fail(err_code);
+  Future<ResolverResults> resolve_result;
+
+  resolver.async_resolve(host, port,
+                         handler_builder::BuildTask(resolve_result));
+
+  auto result = resolve_result.Get();
+
+  if (result.HasError()) {
+    return Fail(result.GetError());
   }
 
-  return Ok(std::move(endpoints_list));
+  return Ok(std::move(*result));
 }
 
 auto Socket::TryToConnect(ResolverResults endpoints_list)
