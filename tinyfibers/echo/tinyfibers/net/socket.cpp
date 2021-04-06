@@ -139,6 +139,7 @@ auto Socket::TryToConnect(ResolverResults endpoints_list)
     auto con_result = TryToConnectToEndpoint(sock, endpoint);
 
     if (!con_result.HasError()) {
+      err.clear();
       break;
     }
     err = con_result.GetErrorCode();
@@ -153,15 +154,15 @@ auto Socket::TryToConnect(ResolverResults endpoints_list)
 
 wheels::Status Socket::TryToConnectToEndpoint(
     tcp::socket& socket, asio::ip::tcp::endpoint endpoint) {
-  asio::error_code err;
-  Future<asio::error_code> conn_result;
+  Future<Dummy> conn_result;
 
-  socket.async_connect(endpoint, [&](asio::error_code err) {
-    conn_result.SetValue(err);
-  });
+  socket.async_connect(endpoint, handler_builder::BuildDummyTask(conn_result));
 
-  err = conn_result.Get();
-  return ToStatus(err);
+  auto result = conn_result.Get();
+  if (result.HasError()) {
+    return Fail(result.GetError());
+  }
+  return Ok();
 }
 
 }  // namespace tinyfibers::net

@@ -8,6 +8,9 @@
 
 namespace tinyfibers {
 
+// Does nothing, helps implementing Future<void>
+struct Dummy {};
+
 template <typename T>
 class Future {
  public:

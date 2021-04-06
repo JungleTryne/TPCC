@@ -1,4 +1,5 @@
 #include <tinyfibers/net/acceptor.hpp>
+#include <tinyfibers/net/async_handler_builder.hpp>
 
 #include <tinyfibers/runtime/scheduler.hpp>
 #include <tinyfibers/runtime/future.hpp>
@@ -56,19 +57,17 @@ Status Acceptor::Listen(size_t backlog) {
 }
 
 Result<Socket> Acceptor::Accept() {
-  asio::error_code err;
   tcp::socket socket(*GetCurrentIOContext());
 
-  Future<asio::error_code> accept_result;
+  Future<Dummy> accept_result;
 
-  acceptor_.async_accept(socket, [&](asio::error_code code) {
-    accept_result.SetValue(code);
-  });
+  acceptor_.async_accept(socket,
+                         handler_builder::BuildDummyTask(accept_result));
 
-  err = accept_result.Get();
+  auto result = accept_result.Get();
 
-  if (err) {
-    return Fail(err);
+  if (result.HasError()) {
+    return Fail(result.GetError());
   }
 
   return Ok(Socket{std::move(socket)});
