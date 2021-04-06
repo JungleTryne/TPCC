@@ -1,7 +1,5 @@
 #pragma once
 
-#include <functional>
-
 #include <asio/ip/tcp.hpp>
 
 #include <tinyfibers/runtime/future.hpp>
