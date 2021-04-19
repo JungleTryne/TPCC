@@ -24,7 +24,9 @@ using QueueT =
     std::priority_queue<TaskNode, std::vector<TaskNode>, TaskNodeComparator>;
 using MutexT = twist::stdlike::mutex;
 
-class PriorityExecutorImpl : public IPriorityExecutor {
+class PriorityExecutorImpl
+    : public IPriorityExecutor,
+      public std::enable_shared_from_this<PriorityExecutorImpl> {
   friend IPriorityExecutorPtr MakePriorityExecutor(IExecutorPtr executor);
 
  public:
@@ -65,7 +67,8 @@ void executors::PriorityExecutorImpl::Execute(int priority, Task&& task) {
   queue_.emplace(std::move(task), priority);
   guard.unlock();
 
-  hood_ptr_->Execute([&]() {
+  auto self = shared_from_this();
+  hood_ptr_->Execute([self, this]() {
     std::unique_lock<MutexT> guard(mutex_);
     Task task = std::move(queue_.top().task);
     queue_.pop();
