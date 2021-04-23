@@ -7,6 +7,35 @@
 namespace await::executors {
 
 template <typename T>
+struct StackNodePtr;
+
+template <typename T>
+struct StackNode {
+  T data;
+  StackNodePtr<T> next;
+};
+
+template <typename T>
+struct StackNodePtr {
+  StackNode<T>* ptr = nullptr;
+};
+
+template <typename T>
+union StackNodePtrHood {
+  uint32_t tag;
+  StackNodePtr<T> ptr;
+
+  StackNodePtrHood(StackNodePtr<T> ptr) : ptr(ptr) {
+  }
+};
+
+template <typename T>
+void AddToTag(StackNodePtr<T>& ptr) {
+  StackNodePtrHood<T> hood(ptr);
+  hood.tag++;
+}
+
+template <typename T>
 class LockFreeStack {
  public:
   void Push(T&& elem);
@@ -15,12 +44,7 @@ class LockFreeStack {
   void ExchangeWithAnother(LockFreeStack<T>& another);
 
  private:
-  struct StackNode {
-    T data;
-    StackNode* next;
-  };
-
-  twist::stdlike::atomic<StackNode*> head_;
+  twist::stdlike::atomic<StackNodePtr<T>> head_;
 };
 
 template <typename T>
@@ -30,32 +54,36 @@ void LockFreeStack<T>::ExchangeWithAnother(LockFreeStack<T>& another) {
 
 template <typename T>
 bool LockFreeStack<T>::IsEmpty() const {
-  return head_ == nullptr;
+  return head_.load().ptr == nullptr;
 }
 
 template <typename T>
 void LockFreeStack<T>::Push(T&& elem) {
-  StackNode* new_node = new StackNode;
-  new_node->data = std::move(elem);
+  StackNodePtr<T> new_node;
+  new_node.ptr = new StackNode<T>;
+
+  new_node.ptr->data = std::move(elem);
 
   do {
-    new_node->next = head_;
-  } while (!head_.compare_exchange_strong(new_node->next, new_node));
+    AddToTag(new_node);
+    new_node.ptr->next = head_;
+  } while (!head_.compare_exchange_strong(new_node.ptr->next, new_node));
 }
 
 template <typename T>
 T LockFreeStack<T>::Pop() {
-  StackNode* node_to_delete = head_;
+  StackNodePtr<T> node_to_delete = head_;
   T result;
 
-  while (node_to_delete &&
-         !head_.compare_exchange_strong(node_to_delete, node_to_delete->next)) {
+  while (node_to_delete.ptr && !head_.compare_exchange_strong(
+                                   node_to_delete, node_to_delete.ptr->next)) {
+    AddToTag(node_to_delete);
     node_to_delete = head_;
   }
 
-  if (node_to_delete != nullptr) {
-    result = std::move(node_to_delete->data);
-    delete node_to_delete;
+  if (node_to_delete.ptr != nullptr) {
+    result = std::move(node_to_delete.ptr->data);
+    delete node_to_delete.ptr;
   }
 
   return result;
