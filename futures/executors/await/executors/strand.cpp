@@ -7,33 +7,13 @@
 namespace await::executors {
 
 template <typename T>
-struct StackNodePtr;
-
-template <typename T>
 struct StackNode {
   T data;
-  StackNodePtr<T> next;
+  StackNode<T>* next;
 };
 
 template <typename T>
-struct StackNodePtr {
-  StackNode<T>* ptr = nullptr;
-};
-
-template <typename T>
-union StackNodePtrHood {
-  uint32_t tag;
-  StackNodePtr<T> ptr;
-
-  StackNodePtrHood(StackNodePtr<T> ptr) : ptr(ptr) {
-  }
-};
-
-template <typename T>
-void AddToTag(StackNodePtr<T>& ptr) {
-  StackNodePtrHood<T> hood(ptr);
-  hood.tag++;
-}
+using StackNodePtr = StackNode<T>*;
 
 template <typename T>
 class LockFreeStack {
@@ -43,7 +23,52 @@ class LockFreeStack {
   bool IsEmpty() const;
   void ExchangeWithAnother(LockFreeStack<T>& another);
 
+  ~LockFreeStack();
+
  private:
+  class LFPointersPool {
+   public:
+    ~LFPointersPool() {
+      while (head_.load() != nullptr) {
+        auto node_to_delete = head_.load();
+        head_.store(head_.load()->next);
+        delete node_to_delete;
+      }
+    }
+
+    void Push(StackNodePtr<T>&& elem) {
+      StackNodePtr<T> new_node = std::move(elem);
+
+      do {
+        new_node->next = head_;
+      } while (!head_.compare_exchange_strong(new_node->next, new_node));
+    }
+
+    StackNodePtr<T> Pop() {
+      StackNodePtr<T> node_to_delete = head_;
+
+      while (node_to_delete && !head_.compare_exchange_strong(
+                                   node_to_delete, node_to_delete->next)) {
+        node_to_delete = head_;
+      }
+
+      if (node_to_delete != nullptr) {
+        return node_to_delete;
+      }
+
+      return {nullptr};
+    }
+
+    bool IsEmpty() const {
+      return head_.load() == nullptr;
+    }
+
+   private:
+    twist::stdlike::atomic<StackNodePtr<T>> head_;
+  };
+
+  LFPointersPool pool_;
+
   twist::stdlike::atomic<StackNodePtr<T>> head_;
 };
 
@@ -54,20 +79,24 @@ void LockFreeStack<T>::ExchangeWithAnother(LockFreeStack<T>& another) {
 
 template <typename T>
 bool LockFreeStack<T>::IsEmpty() const {
-  return head_.load().ptr == nullptr;
+  return head_.load() == nullptr;
 }
 
 template <typename T>
 void LockFreeStack<T>::Push(T&& elem) {
   StackNodePtr<T> new_node;
-  new_node.ptr = new StackNode<T>;
 
-  new_node.ptr->data = std::move(elem);
+  if (pool_.IsEmpty()) {
+    new_node = new StackNode<T>;
+  } else {
+    new_node = pool_.Pop();
+  }
+
+  new_node->data = std::move(elem);
 
   do {
-    AddToTag(new_node);
-    new_node.ptr->next = head_;
-  } while (!head_.compare_exchange_strong(new_node.ptr->next, new_node));
+    new_node->next = head_;
+  } while (!head_.compare_exchange_strong(new_node->next, new_node));
 }
 
 template <typename T>
@@ -75,18 +104,25 @@ T LockFreeStack<T>::Pop() {
   StackNodePtr<T> node_to_delete = head_;
   T result;
 
-  while (node_to_delete.ptr && !head_.compare_exchange_strong(
-                                   node_to_delete, node_to_delete.ptr->next)) {
-    AddToTag(node_to_delete);
+  while (node_to_delete &&
+         !head_.compare_exchange_strong(node_to_delete, node_to_delete->next)) {
     node_to_delete = head_;
   }
 
-  if (node_to_delete.ptr != nullptr) {
-    result = std::move(node_to_delete.ptr->data);
-    delete node_to_delete.ptr;
+  if (node_to_delete != nullptr) {
+    result = std::move(node_to_delete->data);
+    pool_.Push(std::move(node_to_delete));
   }
 
   return result;
+}
+template <typename T>
+LockFreeStack<T>::~LockFreeStack() {
+  while (head_.load() != nullptr) {
+    auto node_to_delete = head_.load();
+    head_.store(head_.load()->next);
+    delete node_to_delete;
+  }
 }
 
 class StrandExecutor : public IExecutor,
