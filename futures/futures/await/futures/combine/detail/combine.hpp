@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+#include <memory>
+#include <await/futures/core/future.hpp>
 
 namespace await::futures::detail {
 
