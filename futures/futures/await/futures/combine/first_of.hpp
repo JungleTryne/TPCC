@@ -14,19 +14,39 @@ namespace await::futures {
 namespace detail {
 
 template <typename T>
-class FirstOfCombinator {
+class FirstOfCombinator
+    : public std::enable_shared_from_this<FirstOfCombinator<T>> {
  public:
   Future<T> Combine(std::vector<Future<T>> inputs) {
-    auto [v_future, v_promise] = MakeContract<std::vector<T>>();
+    auto [v_future, v_promise] = MakeContract<T>();
 
     if (inputs.empty()) {
-      std::move(v_promise).SetValue({});
+      std::move(v_promise).SetValue(0);
       return std::move(v_future);
     }
+
+    auto self = this->shared_from_this();
+    v_promise_ = std::move(v_promise);
+
+    for (size_t i = 0; i < inputs.size(); ++i) {
+      std::move(inputs[i]).Subscribe([self, this](wheels::Result<T> result) {
+        if (released_.exchange(true)) {
+          return;
+        }
+        if (result.HasError()) {
+          std::move(v_promise_).SetError(std::move(result.GetError()));
+        } else {
+          std::move(v_promise_).SetValue(std::move(result));
+        }
+      });
+    }
+
+    return std::move(v_future);
   }
 
  private:
-  bool released_{false};
+  twist::stdlike::atomic<bool> released_{false};
+  Promise<T> v_promise_;
 };
 
 }  // namespace detail
