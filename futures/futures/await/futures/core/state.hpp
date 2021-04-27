@@ -62,7 +62,7 @@ class SharedState {
   }
 
   bool HasResult() const {
-    return result_.has_value();
+    return state_ == OnlyResult;
   }
 
   // Precondition: f.IsReady() == true

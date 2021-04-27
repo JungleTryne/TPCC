@@ -47,7 +47,6 @@ class AllCombinator : public std::enable_shared_from_this<AllCombinator<T>> {
             }
 
             ++counter_;
-            lock.unlock();
 
             if (counter_ == n) {
               std::move(v_promise_).SetValue(std::move(results_));

@@ -22,6 +22,7 @@ class FirstOfCombinator
 
     if (inputs.empty()) {
       std::move(v_promise).SetValue(0);
+      std::move(v_future).GetValue();
       return std::move(v_future);
     }
 
@@ -30,14 +31,13 @@ class FirstOfCombinator
 
     for (size_t i = 0; i < inputs.size(); ++i) {
       std::move(inputs[i]).Subscribe([self, this](wheels::Result<T> result) {
+        if (result.HasError()) {
+          return;
+        }
         if (released_.exchange(true)) {
           return;
         }
-        if (result.HasError()) {
-          std::move(v_promise_).SetError(std::move(result.GetError()));
-        } else {
-          std::move(v_promise_).SetValue(std::move(result));
-        }
+        std::move(v_promise_).SetValue(std::move(result));
       });
     }
 
